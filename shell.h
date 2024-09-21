@@ -1,140 +1,249 @@
-#ifndef HEADER_H
-#define HEADER_H
+#ifndef SHELL_H
+#define SHELL_H
 
-/***** MACROS *****/
-#define PRINT(c) (write(STDERR_FILENO, c, _strlen(c)))
-#define BUFSIZE 10240
-#define DELIMITER " \t\r\n\a"
-
-/*** STANDARD LIBRARIES ***/
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <string.h>
-#include <sys/wait.h>
+#include <stdio.h> /* for printf*/
+#include <unistd.h> /* for fork, execve*/
 #include <stdlib.h>
-#include <signal.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <linux/limits.h>
+#include <string.h> /* for strtok*/
+#include <stddef.h>
+#include <errno.h> /* for errno and perror */
+#include <sys/types.h> /* for type pid */
+#include <sys/wait.h> /* for wait */
+#include <sys/stat.h> /* for use of stat function */
+#include <signal.h> /* for signal management */
+#include <fcntl.h> /* for open files*/
 
-/******** STRING HANDLER FUNCTIONS **********/
+/************* MACROS **************/
 
-char *_strncpy(char *dest, char *src, int n);
-int _strlen(char *s);
-int _putchar(char c);
-int _atoi(char *s);
-void _puts(char *str);
-int _strcmp(char *s1, char *s2);
-int _isalpha(int c);
-void array_rev(char *arr, int len);
-int intlen(int num);
-char *_itoa(unsigned int n);
-char *_strcat(char *dest, char *src);
-char *_strcpy(char *dest, char *src);
-char *_strchr(char *s, char c);
-int _strncmp(const char *s1, const char *s2, size_t n);
-char *_strdup(char *str);
+#include "macros.h" /* for msg help and prompt */
 
-/*********** MEMORY HANDLERS ***********/
-
-void free_env(char **env);
-void *fill_an_array(void *a, int el, unsigned int len);
-char *_memcpy(char *dest, char *src, unsigned int n);
-void *_calloc(unsigned int size);
-void *_realloc(void *ptr, unsigned int old_size, unsigned int new_size);
-void free_all(char **input, char *line);
-
-/****** INPUT FUNCTIONS *******/
-
-char *get_line();
-char *space(char *str);
-char *newline(char *string);
-void hashtag_handler(char *buff);
-void prompt(void);
-unsigned int check_delim(char c, const char *str);
-char *_strtok(char *str, const char *delim);
-int history(char *input);
-char **separator(char *input);
-
-/****** FILE ARGUMENT HANDLER FUNCTIONS ******/
-
-void read_file(char *file, char **argv);
-void treat_file(char *line, int count, FILE *fp, char **argv);
-void exit_bul_for_file(char **cmd, char *line, FILE *fd);
-
-/****** PARSED ARGUMENT HANDLER FUNCTIONS *****/
-
-char **parse_cmd(char *input);
-int handle_builtin(char **cmd, int er);
-int check_cmd(char **cmd, char *input, int c, char **argv);
-void signal_to_handle(int sig);
-
-/******* ERROR HANDLERS ******/
-
-void print_error(char *input, int counter, char **argv);
-void _prerror(char **argv, int c, char **cmd);
-void error_file(char **argv, int c);
-
-/****** ENVIRONMENT HANDLERS ******/
-
-extern char **environ;
-void create_envi(char **envi);
-void free_env(char **env);
-int _setenv(char **cmd);
-int _unsetenv(char **cmd);
-
-/****** PRINTING FUNCTIONS *****/
-
-void print_number(unsigned int n);
-void print_number_int(int n);
-int print_echo(char **cmd);
-
-/******* PATH FINDER *******/
-
-int path_cmd(char **cmd);
-char *build(char *token, char *value);
-char *_getenv(char *name);
-
-/******* HELP HANDLERS *******/
-
-void help_env(void);
-void help_setenv(void);
-void help_unsetenv(void);
-void help_history(void);
-void help_all(void);
-void help_alias(void);
-void help_cd(void);
-void help_exit(void);
-void help_help(void);
-int display_help(char **cmd, __attribute__((unused))int st);
-
-/****** BUILTIN COMMAND HANDLERS AND EXECUTE ******/
-
-int check_builtin(char **cmd);
-int handle_builtin(char **cmd, int st);
-void exit_bul(char **cmd, char *input, char **argv, int c, int stat);
-int change_dir(char **cmd, __attribute__((unused))int st);
-int dis_env(__attribute__((unused)) char **cmd,
-	    __attribute__((unused)) int st);
-int echo_bul(char **cmd, int st);
-int history_dis(__attribute__((unused))char **c,
-		__attribute__((unused)) int st);
-
-/****** BUILT-IN COMMANDS STRUCT *****/
+/************* STRUCTURES **************/
 
 /**
- * struct _builtin - Defines a struct that conatins built-in commands
- * with their respective implementation functions
- * @command: - Built-in command
- * @function: - Pointer to custom functions that have
- * similar functionalities as the built-in commands
+ * struct info- struct for the program's data
+ * @program_name: the name of the executable
+ * @input_line: pointer to the input read for _getline
+ * @command_name: pointer to the first command typed by the user
+ * @exec_counter: number of excecuted comands
+ * @file_descriptor: file descriptor to the input of commands
+ * @tokens: pointer to array of tokenized input
+ * @env: copy of the environ
+ * @alias_list: array of pointers with aliases.
  */
-typedef struct _builtin
+typedef struct info
 {
-	char *command;
-	int (*function)(char **line, int st);
-} builtin;
+	char *program_name;
+	char *input_line;
+	char *command_name;
+	int exec_counter;
+	int file_descriptor;
+	char **tokens;
+	char **env;
+	char **alias_list;
+} data_of_program;
 
-#endif /*HEADER_H*/
+/**
+ * struct builtins - struct for the builtins
+ * @builtin: the name of the builtin
+ * @function: the associated function to be called for each builtin
+ */
+typedef struct builtins
+{
+	char *builtin;
+	int (*function)(data_of_program *data);
+} builtins;
+
+
+/************* MAIN FUNCTIONS *************/
+
+
+/*========  shell.c  ========*/
+
+/* Inicialize the struct with the info of the program */
+void inicialize_data(data_of_program *data, int arc, char *argv[], char **env);
+
+/* Makes the infinite loop that shows the prompt*/
+void sisifo(char *prompt, data_of_program *data);
+
+/* Print the prompt in a new line */
+void handle_ctrl_c(int opr UNUSED);
+
+
+/*========  _getline.c  ========*/
+
+/* Read one line of the standar input*/
+int _getline(data_of_program *data);
+
+/* split the each line for the logical operators if it exist */
+int check_logic_ops(char *array_commands[], int i, char array_operators[]);
+
+
+/*======== expansions.c ========*/
+
+/* expand variables */
+void expand_variables(data_of_program *data);
+
+/* expand aliases */
+void expand_alias(data_of_program *data);
+
+/* append the string to the end of the buffer*/
+int buffer_add(char *buffer, char *str_to_add);
+
+
+/*======== str_tok.c ========*/
+
+/* Separate the string in tokens using a designed delimiter */
+void tokenize(data_of_program *data);
+
+/* Creates a pointer to a part of a string */
+char *_strtok(char *line, char *delim);
+
+
+/*======== execute.c ========*/
+
+/* Execute a command with its entire path */
+int execute(data_of_program *data);
+
+
+/*======== builtins_list.c ========*/
+
+/* If match a builtin, executes it */
+int builtins_list(data_of_program *data);
+
+
+/*======== find_in_path.c ========*/
+
+/* Creates an array of the path directories */
+char **tokenize_path(data_of_program *data);
+
+/* Search for program in path */
+int find_program(data_of_program *data);
+
+
+/************** HELPERS FOR MEMORY MANAGEMENT **************/
+
+
+/*======== helpers_free.c ========*/
+
+/* Frees the memory for directories */
+void free_array_of_pointers(char **directories);
+
+/* Free the fields needed each loop */
+void free_recurrent_data(data_of_program *data);
+
+/* Free all field of the data */
+void free_all_data(data_of_program *data);
+
+
+/************** BUILTINS **************/
+
+
+/*======== builtins_more.c ========*/
+
+/* Close the shell */
+int builtin_exit(data_of_program *data);
+
+/* Change the current directory */
+int builtin_cd(data_of_program *data);
+
+/* set the work directory */
+int set_work_directory(data_of_program *data, char *new_dir);
+
+/* show help information */
+int builtin_help(data_of_program *data);
+
+/* set, unset and show alias */
+int builtin_alias(data_of_program *data);
+
+
+/*======== builtins_env.c ========*/
+
+/* Shows the environment where the shell runs */
+int builtin_env(data_of_program *data);
+
+/* create or override a variable of environment */
+int builtin_set_env(data_of_program *data);
+
+/* delete a variable of environment */
+int builtin_unset_env(data_of_program *data);
+
+
+/************** HELPERS FOR ENVIRONMENT VARIABLES MANAGEMENT **************/
+
+
+/*======== env_management.c ========*/
+
+/* Gets the value of an environment variable */
+char *env_get_key(char *name, data_of_program *data);
+
+/* Overwrite the value of the environment variable */
+int env_set_key(char *key, char *value, data_of_program *data);
+
+/* Remove a key from the environment */
+int env_remove_key(char *key, data_of_program *data);
+
+/* prints the current environ */
+void print_environ(data_of_program *data);
+
+
+/************** HELPERS FOR PRINTING **************/
+
+
+/*======== helpers_print.c ========*/
+
+/* Prints a string in the standar output */
+int _print(char *string);
+
+/* Prints a string in the standar error */
+int _printe(char *string);
+
+/* Prints a string in the standar error */
+int _print_error(int errorcode, data_of_program *data);
+
+
+/************** HELPERS FOR STRINGS MANAGEMENT **************/
+
+
+/*======== helpers_string.c ========*/
+
+/* Counts the number of characters of a string */
+int str_length(char *string);
+
+/* Duplicates an string */
+char *str_duplicate(char *string);
+
+/* Compares two strings */
+int str_compare(char *string1, char *string2, int number);
+
+/* Concatenates two strings */
+char *str_concat(char *string1, char *string2);
+
+/* Reverse a string */
+void str_reverse(char *string);
+
+
+/*======== helpers_numbers.c ========*/
+
+/* Cast from int to string */
+void long_to_string(long number, char *string, int base);
+
+/* convert an string in to a number */
+int _atoi(char *s);
+
+/* count the coincidences of character in string */
+int count_characters(char *string, char *character);
+
+
+/*======== alias_management.c ========*/
+
+/* print the list of alias */
+int print_alias(data_of_program *data, char *alias);
+
+/* get the alias name */
+char *get_alias(data_of_program *data, char *alias);
+
+/* set the alias name */
+int set_alias(char *alias_string, data_of_program *data);
+
+
+#endif /* SHELL_H */
